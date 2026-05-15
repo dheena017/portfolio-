@@ -52,13 +52,11 @@ app.post('/api/login', async (req, res) => {
         // Lookup student by email and verify their stored password
         try {
             const emailMatch = username.trim().toLowerCase();
-            console.log(`Attempting student login for: ${emailMatch}`);
             const student = await getStudentByEmail(emailMatch);
 
             if (student) {
                 const storedPassword = student.password || 'kalvium@123';
                 if (password === storedPassword) {
-                    console.log(`Student authenticated: ${student.name}`);
                     return res.json({
                         success: true,
                         user: {
@@ -94,7 +92,6 @@ app.post('/api/forgot-password', async (req, res) => {
     try {
         const student = await getStudentByEmail(email);
         if (student) {
-            console.log(`Password reset requested for: ${email}`);
             // In a real application, send email with reset link here
             return res.json({ success: true, message: 'Recovery email sent' });
         }
