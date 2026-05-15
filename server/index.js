@@ -46,9 +46,7 @@ app.use('/api/mentors', mentorRoutes);
 app.post('/api/login', async (req, res) => {
     const { username, password, role } = req.body;
 
-    if (role === 'mentor' && username === 'admin' && password === 'password123') {
-        return res.json({ success: true, user: { username: 'admin', role: 'mentor' } });
-    } else if (role === 'student') {
+    if (role === 'student') {
         // Lookup student by email and verify their stored password
         try {
             const emailMatch = username.trim().toLowerCase();
@@ -75,11 +73,6 @@ app.post('/api/login', async (req, res) => {
         } catch (error) {
             console.error('Login error:', error);
         }
-
-        // Fallback for legacy student login
-        if (username === 'student' && password === 'student123') {
-            return res.json({ success: true, user: { username: 'student', role: 'student', studentId: 1 } });
-        }
     } else if (role === 'visitor') {
         return res.json({ success: true, user: { username: 'visitor', role: 'visitor' } });
     }
@@ -89,7 +82,7 @@ app.post('/api/login', async (req, res) => {
 
 app.post('/api/forgot-password', async (req, res) => {
     const { email } = req.body;
-    
+
     // Check if user exists
     try {
         const student = await getStudentByEmail(email);
@@ -101,9 +94,9 @@ app.post('/api/forgot-password', async (req, res) => {
     } catch (error) {
         console.error('Error checking email:', error);
     }
-    
+
     // For security, always return success even if email not found
-    return res.json({ success: true, message: 'Recovery email sent' }); 
+    return res.json({ success: true, message: 'Recovery email sent' });
 });
 
 if (!process.env.NETLIFY) {
