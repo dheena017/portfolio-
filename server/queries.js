@@ -46,7 +46,10 @@ export async function getOperativesInMission(missionId) {
     .eq('mission_id', missionId);
 
   if (error) throw new Error(`Failed to fetch mission operatives: ${error.message}`);
-  return data?.map((mo) => mo.operatives).filter(Boolean) || [];
+  return data?.reduce((acc, mo) => {
+    if (mo.operatives) acc.push(mo.operatives);
+    return acc;
+  }, []) || [];
 }
 
 export async function createOperative(operative) {
@@ -253,7 +256,11 @@ export async function getPortfolioWithMissions(portfolioId) {
 
   if (missError) throw missError;
 
-  const missions = missionsData?.map((pm) => pm.missions).filter(Boolean) || [];
+  const missions =
+    missionsData?.reduce((acc, pm) => {
+      if (pm.missions) acc.push(pm.missions);
+      return acc;
+    }, []) || [];
 
   return { portfolio: portfolioData, missions };
 }
