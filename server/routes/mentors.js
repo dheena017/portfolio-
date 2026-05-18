@@ -1,6 +1,7 @@
 import express from 'express';
-import { getAllMentors, createMentor, updateMentor } from '../queries.js';
+import { getAllMentors, createMentor, updateMentor, getMentorByEmail } from '../queries.js';
 import { requireCoreLeadership } from '../middleware/coreLeadershipAuth.js';
+import bcrypt from 'bcryptjs';
 
 const router = express.Router();
 
@@ -18,7 +19,12 @@ router.get('/', async (req, res) => {
 // POST /api/mentors - create a new mentor
 router.post('/', requireCoreLeadership, async (req, res) => {
   try {
-    const payload = req.body || {};
+    const { password, ...payload } = req.body || {};
+
+    if (password) {
+      payload.password = await bcrypt.hash(password, 10);
+    }
+
     const newMentor = await createMentor(payload);
     res.status(201).json({ success: true, data: newMentor });
   } catch (err) {
@@ -31,7 +37,12 @@ router.post('/', requireCoreLeadership, async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const updates = req.body || {};
+    const { password, ...updates } = req.body || {};
+
+    if (password) {
+      updates.password = await bcrypt.hash(password, 10);
+    }
+
     const updated = await updateMentor(id, updates);
     res.json({ success: true, data: updated });
   } catch (err) {

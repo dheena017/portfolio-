@@ -438,6 +438,18 @@ export async function getAllMentors() {
   return data || [];
 }
 
+export async function getMentorByEmail(email) {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from('mentors')
+    .select('*')
+    .eq('email', email)
+    .single();
+
+  if (error && error.code !== 'PGRST116') throw error;
+  return data || null;
+}
+
 export async function createMentor(mentor) {
   const supabase = getSupabase();
   const { data, error } = await supabase
