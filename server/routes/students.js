@@ -2,6 +2,7 @@ import express from 'express';
 import { getAllStudents, getStudentById, getStudentsByTerm, updateStudent, getStudentPasswordById, updateStudentPassword, createStudent } from '../queries.js';
 import { handleSupabaseError } from '../supabaseClient.js';
 import { requireCoreLeadership } from '../middleware/coreLeadershipAuth.js';
+import bcrypt from 'bcryptjs';
 
 const router = express.Router();
 
@@ -65,10 +66,16 @@ router.post('/:id/change-password', async (req, res) => {
         if (storedPassword === null) {
             return res.status(404).json({ success: false, message: 'Student not found.' });
         }
-        if (storedPassword !== currentPassword) {
+
+        // Support both hashed and plain text (fallback) for transition
+        const isMatch = await bcrypt.compare(currentPassword, storedPassword).catch(() => currentPassword === storedPassword);
+
+        if (!isMatch) {
             return res.status(401).json({ success: false, message: 'Current password is incorrect.' });
         }
-        await updateStudentPassword(studentId, newPassword);
+
+        const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+        await updateStudentPassword(studentId, hashedNewPassword);
         res.json({ success: true, message: 'Password updated successfully.' });
     } catch (error) {
         const err = handleSupabaseError(error);
@@ -76,12 +83,15 @@ router.post('/:id/change-password', async (req, res) => {
     }
 });
 
-export default router;
-
 // POST /api/students - create new student
 router.post('/', requireCoreLeadership, async (req, res) => {
     try {
-        const payload = req.body || {};
+        const { password, ...payload } = req.body || {};
+
+        if (password) {
+            payload.password = await bcrypt.hash(password, 10);
+        }
+
         const created = await createStudent(payload);
         res.status(201).json({ success: true, data: created });
     } catch (error) {
@@ -89,3 +99,5 @@ router.post('/', requireCoreLeadership, async (req, res) => {
         res.status(500).json({ success: false, error: err.message });
     }
 });
+
+export default router;

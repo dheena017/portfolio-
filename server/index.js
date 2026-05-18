@@ -10,7 +10,8 @@ import missionRoutes from './routes/missions.js';
 import archiveRoutes from './routes/archives.js';
 import portfolioRoutes from './routes/portfolio.js';
 import mentorRoutes from './routes/mentors.js';
-import { getStudentByEmail } from './queries.js';
+import { getStudentByEmail, getMentorByEmail } from './queries.js';
+import bcrypt from 'bcryptjs';
 
 dotenv.config();
 
@@ -42,44 +43,57 @@ app.use('/api/archives', archiveRoutes);
 app.use('/api/portfolio', portfolioRoutes);
 app.use('/api/mentors', mentorRoutes);
 
-// Auth Route (Keeping for now as it's simple)
+// Auth Route
 app.post('/api/login', async (req, res) => {
-    const { username, password, role } = req.body;
+    const { email, username, password, role } = req.body;
+    const loginIdentifier = email || username;
 
-    if (role === 'mentor' && username === 'admin' && password === 'password123') {
-        return res.json({ success: true, user: { username: 'admin', role: 'mentor' } });
-    } else if (role === 'student') {
-        // Lookup student by email and verify their stored password
-        try {
-            const emailMatch = username.trim().toLowerCase();
-            const student = await getStudentByEmail(emailMatch);
+    if (!loginIdentifier || !password || !role) {
+        return res.status(400).json({ success: false, message: 'Missing credentials' });
+    }
 
-            if (student) {
-                const storedPassword = student.password || 'kalvium@123';
-                if (password === storedPassword) {
+    try {
+        const identifier = loginIdentifier.trim().toLowerCase();
+
+        if (role === 'mentor') {
+            const mentor = await getMentorByEmail(identifier);
+            if (mentor && mentor.password) {
+                // Support both hashed and plain text (fallback) for transition
+                const isMatch = await bcrypt.compare(password, mentor.password).catch(() => password === mentor.password);
+                if (isMatch) {
                     return res.json({
                         success: true,
                         user: {
-                            username: student.name,
-                            role: 'student',
-                            studentId: student.id,
-                            email: student.email
+                            username: mentor.name,
+                            role: 'mentor',
+                            email: mentor.email
                         }
                     });
-                } else {
-                    return res.status(401).json({ success: false, message: 'Invalid credentials' });
                 }
             }
-        } catch (error) {
-            console.error('Login error:', error);
+        } else if (role === 'student') {
+            const student = await getStudentByEmail(identifier);
+            if (student) {
+                // If student doesn't have a password set, we shouldn't allow default anymore
+                if (student.password) {
+                    const isMatch = await bcrypt.compare(password, student.password).catch(() => password === student.password);
+                    if (isMatch) {
+                        return res.json({
+                            success: true,
+                            user: {
+                                username: student.name,
+                                role: 'student',
+                                studentId: student.id,
+                                email: student.email
+                            }
+                        });
+                    }
+                }
+            }
         }
-
-        // Fallback for legacy student login
-        if (username === 'student' && password === 'student123') {
-            return res.json({ success: true, user: { username: 'student', role: 'student', studentId: 1 } });
-        }
-    } else if (role === 'visitor') {
-        return res.json({ success: true, user: { username: 'visitor', role: 'visitor' } });
+    } catch (error) {
+        console.error('Login error:', error);
+        return res.status(500).json({ success: false, message: 'An internal error occurred' });
     }
 
     res.status(401).json({ success: false, message: 'Invalid credentials' });
@@ -87,7 +101,7 @@ app.post('/api/login', async (req, res) => {
 
 app.post('/api/forgot-password', async (req, res) => {
     const { email } = req.body;
-    
+
     // Check if user exists
     try {
         const student = await getStudentByEmail(email);
@@ -98,9 +112,9 @@ app.post('/api/forgot-password', async (req, res) => {
     } catch (error) {
         console.error('Error checking email:', error);
     }
-    
+
     // For security, always return success even if email not found
-    return res.json({ success: true, message: 'Recovery email sent' }); 
+    return res.json({ success: true, message: 'Recovery email sent' });
 });
 
 if (!process.env.NETLIFY) {
